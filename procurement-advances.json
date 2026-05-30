@@ -1,0 +1,205 @@
+[
+  {
+    "date": "2026-05-18",
+    "officerName": "Naime Cleaning Suprvizr",
+    "advanceAmount": 2500,
+    "purpose": "Cleaning item",
+    "expectedPurchaseDate": "2026-05-20",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1779088714233",
+    "createdAt": 1779088714233,
+    "adjustments": [
+      {
+        "id": "1779103896755",
+        "finalPurchaseAmount": 2490,
+        "returnedAmount": 10,
+        "notes": "BMD ROOM WALL PAINTING PRODUCT PARCHING MR. NAIME ",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1779103896756
+      }
+    ],
+    "updatedAt": 1779103896756
+  },
+  {
+    "date": "2026-05-18",
+    "officerName": "Khokon Admin",
+    "advanceAmount": 12100,
+    "purpose": "Bill Voucher",
+    "expectedPurchaseDate": "2026-05-20",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1779088837440",
+    "createdAt": 1779088837440,
+    "adjustments": [
+      {
+        "id": "1779090424882",
+        "finalPurchaseAmount": 12100,
+        "returnedAmount": 0,
+        "notes": "",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1779090424884
+      }
+    ],
+    "updatedAt": 1779090424885
+  },
+  {
+    "date": "2026-05-19",
+    "officerName": "Naime (Procurement) ",
+    "advanceAmount": 10100,
+    "purpose": "C/of Khokon, Mosquito Net for all Hospital Ward and Cabin",
+    "expectedPurchaseDate": "2026-05-21",
+    "status": "Returned",
+    "createdBy": "user",
+    "id": "1779173697815",
+    "createdAt": 1779173697815,
+    "adjustments": [
+      {
+        "id": "1779177762501",
+        "finalPurchaseAmount": 3520,
+        "returnedAmount": 5500,
+        "notes": "Bedsheet Advance Payment  1000",
+        "finalStatus": "Pending",
+        "adjustedAt": 1779177762501
+      },
+      {
+        "id": "1779177828097",
+        "finalPurchaseAmount": 3520,
+        "returnedAmount": 5500,
+        "notes": "Bedsheet Advance -1000",
+        "finalStatus": "Returned",
+        "adjustedAt": 1779177828097
+      }
+    ],
+    "updatedAt": 1779177828097
+  },
+  {
+    "date": "2026-05-19",
+    "officerName": "Naime",
+    "advanceAmount": 1000,
+    "purpose": "For Bedsheet Parching ",
+    "expectedPurchaseDate": "2026-05-25",
+    "status": "Pending",
+    "createdBy": "user",
+    "id": "1779178294930",
+    "createdAt": 1779178294930,
+    "adjustments": []
+  },
+  {
+    "date": "2026-05-20",
+    "officerName": "Naime ",
+    "advanceAmount": 5000,
+    "purpose": "For Pathology Purchese ",
+    "expectedPurchaseDate": "2026-05-22",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1779256600981",
+    "createdAt": 1779256600981,
+    "adjustments": [
+      {
+        "id": "1779601022775",
+        "finalPurchaseAmount": 5000,
+        "notes": "",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1779601022775
+      }
+    ],
+    "updatedAt": 1779601022775
+  },
+  {
+    "date": "2026-05-20",
+    "officerName": "Naime ",
+    "advanceAmount": 3520,
+    "purpose": "Mosqutos Net",
+    "expectedPurchaseDate": "2026-05-25",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1779263576111",
+    "createdAt": 1779263576112,
+    "adjustments": [
+      {
+        "id": "1779601008461",
+        "finalPurchaseAmount": 4880,
+        "notes": "",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1779601008461
+      }
+    ],
+    "updatedAt": 1779601008461
+  },
+  {
+    "date": "2026-05-20",
+    "officerName": "Musfique ",
+    "advanceAmount": 100,
+    "purpose": "For Transport cost",
+    "expectedPurchaseDate": "2026-05-20",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1779264064604",
+    "createdAt": 1779264064604,
+    "adjustments": [
+      {
+        "id": "1779341954304",
+        "finalPurchaseAmount": 100,
+        "returnedAmount": 0,
+        "notes": "",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1779341954304
+      },
+      {
+        "id": "1779360885782",
+        "finalPurchaseAmount": 80,
+        "returnedAmount": 20,
+        "notes": "Conveyance Bill for office work",
+        "finalStatus": "Returned",
+        "adjustedAt": 1779360885783
+      },
+      {
+        "id": "1779602744857",
+        "finalPurchaseAmount": 100,
+        "returnedAmount": 0,
+        "notes": "Vat office and Rajgonj for office",
+        "finalStatus": "Returned",
+        "adjustedAt": 1779602744857
+      },
+      {
+        "id": "1779685892783",
+        "finalPurchaseAmount": 120,
+        "returnedAmount": -20,
+        "notes": "Gari Bara",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1779685892783
+      }
+    ],
+    "updatedAt": 1779685892783
+  },
+  {
+    "date": "2026-05-23",
+    "officerName": "Hasan Vai",
+    "advanceAmount": 23524,
+    "purpose": "Purchase's Diesel for Generator   ",
+    "expectedPurchaseDate": "2026-05-24",
+    "status": "Returned",
+    "createdBy": "user",
+    "id": "1779516135650",
+    "createdAt": 1779516135650,
+    "adjustments": [
+      {
+        "id": "1779603662748",
+        "finalPurchaseAmount": 232,
+        "notes": "",
+        "finalStatus": "Pending",
+        "adjustedAt": 1779603662748
+      },
+      {
+        "id": "1779603706238",
+        "finalPurchaseAmount": 23524,
+        "returnedAmount": 0,
+        "notes": "Diesel Done",
+        "finalStatus": "Returned",
+        "adjustedAt": 1779603706238
+      }
+    ],
+    "updatedAt": 1779603706238
+  }
+]

@@ -1,0 +1,123 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: expenses
+// Document ID: auto-generated
+// Fields:
+//   - date: string (required, ISO date)
+//   - department: string (required)
+//   - category: string (required)
+//   - amount: number (required, positive)
+//   - description: string (required)
+//   - receiptUrl: string (optional)
+//   - createdAt: number (required)
+//   - createdBy: string (required, UID)
+//
+// Collection: cashIn
+// Document ID: auto-generated
+// Fields:
+//   - date: string (required, ISO date)
+//   - amount: number (required, positive)
+//   - source: string (required)
+//   - createdAt: number (required)
+//   - createdBy: string (required, UID)
+//
+// Collection: categories
+// Document ID: auto-generated
+// Fields:
+//   - name: string (required, unique)
+//   - createdAt: number (required)
+//
+// Collection: users
+// Document ID: userId (UID)
+// Fields:
+//   - email: string (required)
+//   - displayName: string (optional)
+//   - role: string (required, enum: ["admin", "accounts_officer"])
+//   - createdAt: number (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "mdfyslsany@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isAccountsOfficer() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'accounts_officer';
+    }
+
+    function isStaff() {
+      return isAdmin() || isAccountsOfficer();
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}.*");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['date', 'department', 'category', 'amount', 'description', 'createdAt', 'createdBy']) &&
+             isValidDateString(data.date) &&
+             data.department is string && data.department.size() > 0 &&
+             data.category is string && data.category.size() > 0 &&
+             data.amount is number && data.amount > 0 &&
+             data.description is string && data.description.size() > 0 &&
+             data.createdAt is number &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidCashIn(data) {
+      return data.keys().hasAll(['date', 'amount', 'source', 'createdAt', 'createdBy']) &&
+             isValidDateString(data.date) &&
+             data.amount is number && data.amount > 0 &&
+             data.source is string && data.source.size() > 0 &&
+             data.createdAt is number &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.createdAt is number;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt']) &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'accounts_officer'] &&
+             data.createdAt is number;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Allow authenticated users full read/write access to all collections
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "Expense": {
+      "title": "Expense",
+      "description": "A petty cash expense record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date", "description": "ISO date string" },
+        "department": { "type": "string", "description": "Department name" },
+        "category": { "type": "string", "description": "Expense category" },
+        "amount": { "type": "number", "description": "Amount in BDT" },
+        "description": { "type": "string", "description": "Purpose of expense" },
+        "receiptUrl": { "type": "string", "description": "Link to digital voucher" },
+        "createdAt": { "type": "number", "description": "Timestamp" },
+        "createdBy": { "type": "string", "description": "User UID" }
+      },
+      "required": ["date", "department", "category", "amount", "description", "createdAt", "createdBy"]
+    },
+    "CashIn": {
+      "title": "CashIn",
+      "description": "A petty cash fund refill record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date", "description": "ISO date string" },
+        "amount": { "type": "number", "description": "Amount in BDT" },
+        "source": { "type": "string", "description": "Source of funds" },
+        "createdAt": { "type": "number", "description": "Timestamp" },
+        "createdBy": { "type": "string", "description": "User UID" }
+      },
+      "required": ["date", "amount", "source", "createdAt", "createdBy"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Custom expense category",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Category name" },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["name", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and role",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "accounts_officer"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Collection of all expenses"
+    },
+    "/cashIn/{cashInId}": {
+      "schema": "CashIn",
+      "description": "Collection of all fund refills"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of custom categories"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    }
+  }
+}
