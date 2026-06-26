@@ -2,7 +2,7 @@
 // PROCUREMENT ADVANCE MODULE - TYPES & UTILITIES
 // ============================================================================
 
-import { ProcurementAdvance, StaffLoan, CreditPurchase, ProcurementAdvanceStatus } from '../../types';
+import { ProcurementAdvance, StaffLoan, CreditPurchase, ProcurementAdvanceStatus } from './types';
 
 export function calculateProcurementStats(advances: ProcurementAdvance[]) {
   const totalPending = advances

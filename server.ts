@@ -19,6 +19,29 @@ const EXPENSES_FILE = path.join(baseDir, "expenses.json");
 const PROCUREMENT_FILE = path.join(baseDir, "procurement-advances.json");
 const LOANS_FILE = path.join(baseDir, "staff-loans.json");
 const CREDITS_FILE = path.join(baseDir, "credit-purchases.json");
+const VENDORS_FILE = path.join(baseDir, "vendors.json");
+
+async function readJsonFile(filePath: string, fallback: any = []) {
+  try {
+    const data = await fs.readFile(filePath, "utf-8");
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+async function writeJsonFile(filePath: string, data: any) {
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+}
+
+function normalizeVendorName(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function formatVendorName(value: string) {
+  return value.trim().replace(/\s+/g, ' ');
+}
 
 // Initialize Firebase if config exists
 let db: any = null;
@@ -375,18 +398,39 @@ async function startServer() {
   // ============================================================================
   // CREDIT PURCHASE ROUTES
   // ============================================================================
+
+  // GET /api/vendors - Get all saved vendor names
+  app.get("/api/vendors", async (req, res) => {
+    try {
+      const vendors = await readJsonFile(VENDORS_FILE, []);
+      const uniqueVendors = Array.from(
+        new Set(
+          vendors
+            .map((vendor: any) => {
+              if (typeof vendor === 'string') return formatVendorName(vendor);
+              if (vendor && typeof vendor === 'object') {
+                const name = vendor.vendorName || vendor.name || '';
+                return formatVendorName(name);
+              }
+              return '';
+            })
+            .filter(Boolean)
+        )
+      ) as string[];
+
+      uniqueVendors.sort((a: string, b: string) => a.localeCompare(b));
+
+      res.json(uniqueVendors);
+    } catch (error) {
+      console.error("Failed to read vendors:", error);
+      res.status(500).json({ error: "Failed to read vendors" });
+    }
+  });
   
   // GET /api/credit-purchases - Get all credit purchases
   app.get("/api/credit-purchases", async (req, res) => {
     try {
-      let purchases = [];
-      try {
-        const data = await fs.readFile(CREDITS_FILE, "utf-8");
-        purchases = JSON.parse(data);
-      } catch (err) {
-        purchases = [];
-      }
-      if (!Array.isArray(purchases)) purchases = [];
+      let purchases = await readJsonFile(CREDITS_FILE, []);
       purchases.sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
       res.json(purchases);
     } catch (error) {
@@ -402,25 +446,38 @@ async function startServer() {
       return res.status(400).json({ error: 'Invalid purchase payload' });
     }
 
-    const serverPurchase = {
-      ...payload,
-      id: Date.now().toString(),
-      createdAt: Date.now(),
-      payments: [],
-      status: 'Unpaid'
-    };
+    const vendorName = formatVendorName(String(payload.vendorName || ''));
+    if (!vendorName) {
+      return res.status(400).json({ error: 'Vendor name is required' });
+    }
+
+    const normalizedVendorName = normalizeVendorName(vendorName);
 
     try {
-      let purchases = [];
-      try {
-        const data = await fs.readFile(CREDITS_FILE, "utf-8");
-        purchases = JSON.parse(data);
-      } catch (err) {
-        purchases = [];
+      let purchases = await readJsonFile(CREDITS_FILE, []);
+      let vendors = await readJsonFile(VENDORS_FILE, []);
+
+      const vendorExists = vendors.some((vendor: any) => {
+        const currentName = typeof vendor === 'string' ? vendor : (vendor.vendorName || vendor.name || '');
+        return normalizeVendorName(currentName) === normalizedVendorName;
+      });
+
+      if (!vendorExists) {
+        vendors = [...vendors, vendorName];
+        await writeJsonFile(VENDORS_FILE, vendors);
       }
-      if (!Array.isArray(purchases)) purchases = [];
+
+      const serverPurchase = {
+        ...payload,
+        vendorName,
+        id: Date.now().toString(),
+        createdAt: Date.now(),
+        payments: [],
+        status: 'Unpaid'
+      };
+
       purchases.push(serverPurchase);
-      await fs.writeFile(CREDITS_FILE, JSON.stringify(purchases, null, 2), "utf-8");
+      await writeJsonFile(CREDITS_FILE, purchases);
       console.log("Saved credit purchase", serverPurchase.id);
       res.json({ message: "Purchase saved successfully", purchase: serverPurchase });
     } catch (error) {
@@ -498,7 +555,7 @@ async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -506,12 +563,19 @@ async function startServer() {
     // Serve static files in production
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    if (process.env.NODE_ENV === "production") {
+      res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+    } else {
+      // In dev, let Vite handle it
+      res.sendFile(path.join(baseDir, 'index.html'));
+    }
+  });
+
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

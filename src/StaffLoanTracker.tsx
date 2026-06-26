@@ -239,6 +239,7 @@ interface LoanCardProps {
   loan: StaffLoan;
   onAddRepayment: () => void;
   onDelete: () => void;
+  key?: React.Key;
 }
 
 function LoanCard({ loan, onAddRepayment, onDelete }: LoanCardProps) {

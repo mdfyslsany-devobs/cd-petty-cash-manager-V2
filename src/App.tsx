@@ -19,7 +19,8 @@ import {
   LogOut,
   LogIn,
   AlertCircle,
-  Printer
+  Printer,
+  Sparkles
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -248,22 +249,25 @@ function PettyCashApp() {
     }
   };
 
-  const addExpense = async (expense: Omit<Expense, 'id' | 'createdAt' | 'createdBy'>) => {
-    if (!user) return;
+  const addExpense = async (expenseData: any, isQuickEntry: boolean = false): Promise<boolean> => {
+    if (!user) return false;
     setIsSyncing(true);
     try {
       const response = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...expense,
+          ...expenseData,
           createdBy: user.uid
         }),
       });
 
       if (response.ok) {
         await fetchExpenses();
-        setActiveTab('history');
+        if (!isQuickEntry) {
+          setActiveTab('history');
+        }
+        return true;
       } else {
         throw new Error('Failed to save expense via local API');
       }
@@ -272,14 +276,17 @@ function PettyCashApp() {
 
       try {
         const docRef = await addDoc(collection(db, 'expenses'), {
-          ...expense,
+          ...expenseData,
           createdAt: Date.now(),
           createdBy: user.uid
         });
 
         if (docRef.id) {
           await fetchExpenses();
-          setActiveTab('history');
+          if (!isQuickEntry) {
+            setActiveTab('history');
+          }
+          return true;
         }
       } catch (fsError) {
         handleFirestoreError(fsError, OperationType.CREATE, 'expenses');
@@ -287,6 +294,12 @@ function PettyCashApp() {
     } finally {
       setIsSyncing(false);
     }
+
+    return false;
+  };
+
+  const handleExpenseSubmit = async (expenseData: any, isQuickEntry: boolean = false) => {
+    return addExpense(expenseData, isQuickEntry);
   };
 
   const addCash = async (entry: Omit<CashIn, 'id' | 'createdAt' | 'createdBy'>) => {
@@ -445,6 +458,45 @@ function PettyCashApp() {
                 <LogIn size={20} />
                 {isLoggingIn ? 'Logging in...' : 'Login'}
               </button>
+
+              <button 
+                type="button"
+                onClick={() => {
+                  // Set a mock user for demo purposes
+                  setUser({
+                    uid: 'demo-user-123',
+                    email: 'demo@cdpath.com',
+                    displayName: 'Demo User',
+                    photoURL: 'https://ui-avatars.com/api/?name=Demo+User',
+                    emailVerified: true,
+                    isAnonymous: false,
+                    metadata: {},
+                    providerData: [],
+                    phoneNumber: null,
+                    tenantId: null,
+                    reload: async () => {},
+                    getIdToken: async () => 'demo-token',
+                    getIdTokenResult: async () => ({ token: 'demo-token', claims: {}, issuedAtTime: new Date(), expirationTime: new Date(), signInProvider: null, signInSecond: 0 }),
+                    toJSON: () => ({}),
+                    delete: async () => {},
+                    getDisplayName: () => 'Demo User',
+                    linkWithCredential: async () => null as any,
+                    linkWithPhoneNumber: async () => null as any,
+                    linkWithPopup: async () => null as any,
+                    linkWithRedirect: async () => Promise.resolve(),
+                    reauthenticateWithCredential: async () => null as any,
+                    reauthenticateWithPhoneNumber: async () => null as any,
+                    reauthenticateWithPopup: async () => null as any,
+                    reauthenticateWithRedirect: async () => Promise.resolve(),
+                    unlink: async () => null as any
+                  } as any);
+                  setUserRole('accounts_officer');
+                }}
+                className="w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-semibold transition-all text-sm"
+              >
+                <Sparkles size={18} />
+                Try Demo Mode
+              </button>
             </form>
 
             <p className="text-[10px] text-slate-400 text-center mt-6 uppercase tracking-widest font-bold">
@@ -470,12 +522,30 @@ function PettyCashApp() {
     value: expenses.filter(e => e.department === dept).reduce((sum, e) => sum + e.amount, 0)
   })).filter(d => d.value > 0);
 
-  const categoryData = categories.map(cat => ({
+  const categoryDataRaw = categories.map(cat => ({
     name: cat,
     value: expenses.filter(e => e.category === cat).reduce((sum, e) => sum + e.amount, 0)
-  })).filter(c => c.value > 0);
+  })).filter(c => c.value != null && c.value > 0);
+
+  const categoryData = groupSmallCategories(categoryDataRaw, 7);
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+  function groupSmallCategories(data: Array<{ name: string; value: number }>, maxItems: number) {
+    const filtered = data
+      .filter(item => item.value != null && item.value !== 0)
+      .sort((a, b) => b.value - a.value);
+
+    if (filtered.length <= maxItems) {
+      return filtered;
+    }
+
+    const topItems = filtered.slice(0, maxItems - 1);
+    const otherItems = filtered.slice(maxItems - 1);
+    const otherValue = otherItems.reduce((sum, item) => sum + item.value, 0);
+
+    return [...topItems, { name: 'Other', value: otherValue }];
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#1E293B] font-sans">
@@ -694,7 +764,7 @@ function PettyCashApp() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-4">
                     {categoryData.map((cat, i) => (
-                      <div key={cat.name} className="flex items-center gap-2">
+                      <div key={`category-${i}`} className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                         <span className="text-[10px] text-slate-500 truncate">{cat.name}</span>
                       </div>
@@ -718,7 +788,7 @@ function PettyCashApp() {
             <div className="max-w-2xl mx-auto">
               <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
                 <ExpenseForm 
-                  onSubmit={addExpense} 
+                  onSubmit={handleExpenseSubmit} 
                   categories={categories} 
                   onAddCategory={addCategory}
                   isSyncing={isSyncing}
@@ -1192,7 +1262,7 @@ function StatCard({ label, value, icon, trend, highlight }: { label: string, val
 }
 
 function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: { 
-  onSubmit: (expense: Omit<Expense, 'id' | 'createdAt' | 'createdBy'>) => void, 
+  onSubmit: (expense: Omit<Expense, 'id' | 'createdAt' | 'createdBy'>, isQuickEntry?: boolean) => Promise<boolean>, 
   categories: Category[],
   onAddCategory: (name: string) => Promise<void>,
   isSyncing?: boolean
@@ -1205,20 +1275,42 @@ function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: {
     description: '',
     receiptUrl: ''
   });
+  const [quickEntryMode, setQuickEntryMode] = useState(false);
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const amountInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Update default category when categories change
+  useEffect(() => {
+    if (categories.length > 0 && !formData.category) {
+      setFormData(prev => ({ ...prev, category: categories[0] }));
+    }
+  }, [categories]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.amount || !formData.description || !formData.category) return;
-    
-    onSubmit({
+
+    const success = await onSubmit({
       ...formData,
       amount: parseFloat(formData.amount),
       department: formData.department as Department,
       category: formData.category as Category
-    });
+    }, quickEntryMode);
+
+    if (success && quickEntryMode) {
+      // Clear amount, description, and receiptUrl - keep date and department
+      setFormData(prev => ({ 
+        ...prev, 
+        amount: '', 
+        description: '', 
+        receiptUrl: '',
+        category: categories[0] || ''
+      }));
+      // Auto-focus amount field for rapid entry
+      setTimeout(() => amountInputRef.current?.focus(), 100);
+    }
   };
 
   const handleAddNewCategory = async () => {
@@ -1238,6 +1330,23 @@ function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-700">Continuous Quick Entry Mode</p>
+          <p className="text-[11px] text-slate-400">When ON, keeps date & department and allows rapid entries</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setQuickEntryMode(prev => !prev)}
+          className={cn(
+            'px-3 py-1 rounded-full text-sm font-bold transition-colors',
+            quickEntryMode ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
+          )}
+          aria-pressed={quickEntryMode}
+        >
+          {quickEntryMode ? 'ON' : 'OFF'}
+        </button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Date</label>
@@ -1246,14 +1355,16 @@ function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: {
             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             value={formData.date}
             onChange={e => setFormData({...formData, date: e.target.value})}
+            disabled={quickEntryMode}
           />
         </div>
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Department</label>
           <select 
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-75"
             value={formData.department}
             onChange={e => setFormData({...formData, department: e.target.value as Department})}
+            disabled={quickEntryMode}
           >
             {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
@@ -1305,6 +1416,7 @@ function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: {
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount (৳)</label>
           <input 
+            ref={amountInputRef}
             type="number" 
             placeholder="0.00"
             className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -1314,7 +1426,7 @@ function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: {
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Description / Purpose</label>
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Description / Purpose</label>
         <textarea 
           placeholder="What was this expense for?"
           className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 h-24"
@@ -1323,7 +1435,7 @@ function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: {
         />
       </div>
       <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Digital Voucher URL (Optional)</label>
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Digital Voucher URL (Optional)</label>
         <input 
           type="url" 
           placeholder="https://..."
@@ -1572,7 +1684,7 @@ function DailyDashboard({ expenses, cashIn, reportFilter, setReportFilter }: {
               {(selectedDept ? filteredExpenses.filter(e => e.department === selectedDept) : filteredExpenses).length > 0 ? (
                 (selectedDept ? filteredExpenses.filter(e => e.department === selectedDept) : filteredExpenses).map(e => (
                   <div key={e.id} className="flex justify-between items-start py-3 border-b border-slate-50 last:border-0">
-                    <div className="flex-1">
+                    <div>
                       <p className="text-sm font-bold text-slate-900">{e.description}</p>
                       <p className="text-[10px] text-slate-400 uppercase font-bold">
                         {format(parseISO(e.date), 'MMM dd')} • {e.department} • {e.category}

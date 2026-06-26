@@ -10,6 +10,7 @@ interface CreditPurchaseTrackerPageProps {
 
 export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerPageProps) {
   const [purchases, setPurchases] = useState<CreditPurchase[]>([]);
+  const [vendorOptions, setVendorOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -21,6 +22,7 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
 
   useEffect(() => {
     fetchPurchases();
+    fetchVendors();
   }, []);
 
   const fetchPurchases = async () => {
@@ -37,6 +39,17 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
     }
   };
 
+  const fetchVendors = async () => {
+    try {
+      const response = await fetch('/api/vendors');
+      const data = await response.json();
+      setVendorOptions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error);
+      setVendorOptions([]);
+    }
+  };
+
   const handleAddPurchase = async (formData: any) => {
     try {
       const response = await fetch('/api/credit-purchases', {
@@ -46,7 +59,11 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
       });
       const result = await response.json();
       if (response.ok) {
-        setPurchases([result.purchase, ...purchases]);
+        setPurchases(prev => [result.purchase, ...prev]);
+        setVendorOptions(prev => {
+          const nextVendor = result.purchase.vendorName;
+          return prev.includes(nextVendor) ? prev : [...prev, nextVendor].sort((a, b) => a.localeCompare(b));
+        });
         setShowAddForm(false);
       }
     } catch (error) {
@@ -64,7 +81,7 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
       });
       const result = await response.json();
       if (response.ok) {
-        setPurchases(purchases.map(p => (p.id === result.purchase.id ? result.purchase : p)));
+        setPurchases(prev => prev.map(p => (p.id === result.purchase.id ? result.purchase : p)));
         setShowPaymentForm(false);
         setSelectedPurchase(null);
       }
@@ -77,7 +94,7 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
     try {
       const response = await fetch(`/api/credit-purchases/${id}`, { method: 'DELETE' });
       if (response.ok) {
-        setPurchases(purchases.filter(p => p.id !== id));
+        setPurchases(prev => prev.filter(p => p.id !== id));
         setConfirmDialog({ isOpen: false, id: '' });
       }
     } catch (error) {
@@ -87,10 +104,30 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
 
   const filteredPurchases = purchases.filter(p => {
     const matchesSearch = p.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         p.description.toLowerCase().includes(searchTerm.toLowerCase());
+                         p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         p.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const groupedPurchases = (
+    Object.values(
+      filteredPurchases.reduce<Record<string, { vendorName: string; purchases: CreditPurchase[] }>>(
+        (acc, purchase) => {
+          const key = purchase.vendorName.trim().toLowerCase();
+          if (!acc[key]) {
+            acc[key] = {
+              vendorName: purchase.vendorName,
+              purchases: [],
+            };
+          }
+          acc[key].purchases.push(purchase);
+          return acc;
+        },
+        {}
+      ) as Record<string, { vendorName: string; purchases: CreditPurchase[] }>
+    ) as Array<{ vendorName: string; purchases: CreditPurchase[] }>
+  ).sort((a, b) => a.vendorName.localeCompare(b.vendorName));
 
   const stats = calculateCreditStats(purchases);
 
@@ -164,20 +201,20 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
 
       {/* Purchases List */}
       <div className="space-y-3">
-        {filteredPurchases.length === 0 ? (
+        {groupedPurchases.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg">
             <p className="text-gray-500">No purchases found</p>
           </div>
         ) : (
-          filteredPurchases.map(purchase => (
-            <PurchaseCard
-              key={purchase.id}
-              purchase={purchase}
-              onAddPayment={() => {
+          groupedPurchases.map(group => (
+            <VendorGroupCard
+              key={group.vendorName}
+              group={group}
+              onAddPayment={(purchase) => {
                 setSelectedPurchase(purchase);
                 setShowPaymentForm(true);
               }}
-              onDelete={() => setConfirmDialog({ isOpen: true, id: purchase.id })}
+              onDelete={(id) => setConfirmDialog({ isOpen: true, id })}
             />
           ))
         )}
@@ -186,6 +223,7 @@ export function CreditPurchaseTrackerPage({ onNavigate }: CreditPurchaseTrackerP
       {/* Forms */}
       {showAddForm && (
         <AddPurchaseForm
+          vendorOptions={vendorOptions}
           onSubmit={handleAddPurchase}
           onClose={() => setShowAddForm(false)}
         />
@@ -253,118 +291,128 @@ function StatCard({ label, value, color }: StatCardProps) {
   );
 }
 
-interface PurchaseCardProps {
-  purchase: CreditPurchase;
-  onAddPayment: () => void;
-  onDelete: () => void;
+interface VendorGroupCardProps {
+  group: {
+    vendorName: string;
+    purchases: CreditPurchase[];
+  };
+  onAddPayment: (purchase: CreditPurchase) => void;
+  onDelete: (id: string) => void;
+  key?: React.Key;
 }
 
-function PurchaseCard({ purchase, onAddPayment, onDelete }: PurchaseCardProps) {
+function VendorGroupCard({ group, onAddPayment, onDelete }: VendorGroupCardProps) {
   const statusColors = {
     Unpaid: 'bg-red-100 text-red-800',
     'Partially Paid': 'bg-yellow-100 text-yellow-800',
     Paid: 'bg-green-100 text-green-800',
   };
 
-  const paid = purchase.payments.reduce((sum, p) => sum + p.paidAmount, 0);
-  const remaining = getRemainingBalance(purchase.billAmount, purchase.payments);
-  const isPurchaseOverdue = isOverdue(purchase.duePaymentDate) && purchase.status !== 'Paid';
+  const totalBill = group.purchases.reduce((sum, purchase) => sum + purchase.billAmount, 0);
+  const totalDue = group.purchases.reduce((sum, purchase) => {
+    const paid = purchase.payments.reduce((paymentSum, payment) => paymentSum + payment.paidAmount, 0);
+    return sum + getRemainingBalance(purchase.billAmount, purchase.payments);
+  }, 0);
 
   return (
-    <div className={`rounded-lg shadow p-4 hover:shadow-md transition ${isPurchaseOverdue ? 'bg-red-50 border-2 border-red-300' : 'bg-white'}`}>
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900">{purchase.vendorName}</h3>
-          <p className="text-sm text-gray-600">{purchase.description}</p>
-          <p className="text-xs text-gray-500 mt-1">Invoice: {purchase.invoiceNumber} • Dept: {purchase.department}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {isPurchaseOverdue && (
-            <div className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
-              <AlertTriangle className="w-4 h-4" />
-              Overdue
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-gray-200 bg-gray-50 px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">{group.vendorName}</h3>
+            <p className="text-sm text-gray-500">{group.purchases.length} invoice{group.purchases.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:min-w-[320px]">
+            <div className="rounded-lg bg-white px-3 py-2 border border-gray-200">
+              <p className="text-xs text-gray-500">Total Bill</p>
+              <p className="font-semibold text-gray-900">{formatCurrency(totalBill)}</p>
             </div>
-          )}
-          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${statusColors[purchase.status]}`}>
-            {purchase.status}
-          </span>
+            <div className="rounded-lg bg-white px-3 py-2 border border-gray-200">
+              <p className="text-xs text-gray-500">Total Due</p>
+              <p className="font-semibold text-red-700">{formatCurrency(totalDue)}</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
-        <div>
-          <span className="text-gray-500">Bill Amount</span>
-          <p className="font-semibold text-gray-900">{formatCurrency(purchase.billAmount)}</p>
-        </div>
-        <div>
-          <span className="text-gray-500">Paid</span>
-          <p className="font-semibold text-green-700">{formatCurrency(paid)}</p>
-        </div>
-        <div>
-          <span className="text-gray-500">Due Amount</span>
-          <p className="font-semibold text-red-700">{formatCurrency(remaining)}</p>
-        </div>
-        <div>
-          <span className="text-gray-500">Due Date</span>
-          <p className="font-semibold text-gray-900">{formatDate(purchase.duePaymentDate)}</p>
-        </div>
-      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-white">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Due Date</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {group.purchases.map(purchase => {
+              const paid = purchase.payments.reduce((sum, payment) => sum + payment.paidAmount, 0);
+              const remaining = getRemainingBalance(purchase.billAmount, purchase.payments);
+              const isPurchaseOverdue = isOverdue(purchase.duePaymentDate) && purchase.status !== 'Paid';
 
-      {/* Payment Progress */}
-      <div className="mb-4">
-        <div className="flex justify-between text-xs text-gray-600 mb-1">
-          <span>Payment Progress</span>
-          <span>{Math.round((paid / purchase.billAmount) * 100)}%</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div
-            className="bg-green-600 h-2 rounded-full transition-all"
-            style={{ width: `${Math.min((paid / purchase.billAmount) * 100, 100)}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Payments List */}
-      {purchase.payments.length > 0 && (
-        <div className="mb-4 bg-gray-50 rounded p-3 text-sm">
-          <p className="font-semibold text-gray-900 mb-2">Payments ({purchase.payments.length})</p>
-          <ul className="space-y-1">
-            {purchase.payments.map((p, i) => (
-              <li key={p.id} className="flex justify-between text-gray-700">
-                <span>{formatDate(p.paymentDate)}</span>
-                <span className="font-semibold">{formatCurrency(p.paidAmount)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        {purchase.status !== 'Paid' && (
-          <button
-            onClick={onAddPayment}
-            className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium"
-          >
-            Add Payment
-          </button>
-        )}
-        <button
-          onClick={onDelete}
-          className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm font-medium"
-        >
-          Delete
-        </button>
+              return (
+                <tr key={purchase.id} className={isPurchaseOverdue ? 'bg-red-50' : 'bg-white'}>
+                  <td className="px-4 py-3 align-top">
+                    <div className="font-medium text-gray-900">{purchase.invoiceNumber}</div>
+                    <div className="text-xs text-gray-500">{purchase.department}</div>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <div className="text-sm text-gray-900">{purchase.description}</div>
+                    {purchase.notes && (
+                      <div className="text-xs text-gray-500 mt-1">{purchase.notes}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 align-top text-sm">
+                    <div className="font-semibold text-gray-900">{formatCurrency(purchase.billAmount)}</div>
+                    <div className="text-xs text-green-700">Paid: {formatCurrency(paid)}</div>
+                    <div className="text-xs text-red-700">Due: {formatCurrency(remaining)}</div>
+                  </td>
+                  <td className="px-4 py-3 align-top text-sm text-gray-900">
+                    {formatDate(purchase.duePaymentDate)}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusColors[purchase.status]}`}>
+                      {purchase.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 align-top text-right">
+                    <div className="flex justify-end gap-2">
+                      {purchase.status !== 'Paid' && (
+                        <button
+                          onClick={() => onAddPayment(purchase)}
+                          className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium"
+                        >
+                          Add Payment
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onDelete(purchase.id)}
+                        className="px-3 py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
 interface AddPurchaseFormProps {
+  vendorOptions: string[];
   onSubmit: (data: any) => void;
   onClose: () => void;
 }
 
-function AddPurchaseForm({ onSubmit, onClose }: AddPurchaseFormProps) {
+function AddPurchaseForm({ vendorOptions, onSubmit, onClose }: AddPurchaseFormProps) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     vendorName: '',
@@ -408,11 +456,17 @@ function AddPurchaseForm({ onSubmit, onClose }: AddPurchaseFormProps) {
               <input
                 type="text"
                 required
+                list="vendor-suggestions"
                 value={formData.vendorName}
                 onChange={(e) => setFormData({ ...formData, vendorName: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="Enter vendor name"
+                placeholder="Type or select vendor"
               />
+              <datalist id="vendor-suggestions">
+                {vendorOptions.map(option => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
@@ -617,17 +671,20 @@ function VendorLedgerModal({ stats, onClose }: VendorLedgerModalProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(stats.vendorSummary).map(([vendor, data]) => (
-                    <tr key={vendor} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{vendor}</td>
-                      <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(data.purchase)}</td>
-                      <td className="px-4 py-3 text-right text-green-700 font-medium">{formatCurrency(data.paid)}</td>
-                      <td className="px-4 py-3 text-right text-red-700 font-medium">{formatCurrency(data.due)}</td>
-                      <td className="px-4 py-3 text-center text-gray-900 font-medium">
-                        {Math.round((data.paid / data.purchase) * 100)}%
-                      </td>
-                    </tr>
-                  ))}
+                  {Object.entries(stats.vendorSummary).map(([vendor, rawData]) => {
+                    const data = rawData as { purchase: number; paid: number; due: number };
+                    return (
+                      <tr key={vendor} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">{vendor}</td>
+                        <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(data.purchase)}</td>
+                        <td className="px-4 py-3 text-right text-green-700 font-medium">{formatCurrency(data.paid)}</td>
+                        <td className="px-4 py-3 text-right text-red-700 font-medium">{formatCurrency(data.due)}</td>
+                        <td className="px-4 py-3 text-center text-gray-900 font-medium">
+                          {Math.round((data.paid / data.purchase) * 100)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

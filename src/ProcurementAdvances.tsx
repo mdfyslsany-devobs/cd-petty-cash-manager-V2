@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Filter, Download, Printer, Search, MoreVertical } from 'lucide-react';
-import { ProcurementAdvance } from '../types';
+import { ProcurementAdvance } from './types';
 import { calculateProcurementStats, formatCurrency, formatDate } from './ModuleCalculations';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -229,6 +229,7 @@ interface AdvanceCardProps {
   advance: ProcurementAdvance;
   onAdjust: () => void;
   onDelete: () => void;
+  key?: React.Key;
 }
 
 function AdvanceCard({ advance, onAdjust, onDelete }: AdvanceCardProps) {
