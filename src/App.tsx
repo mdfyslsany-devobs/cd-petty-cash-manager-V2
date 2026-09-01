@@ -20,7 +20,8 @@ import {
   LogIn,
   AlertCircle,
   Printer,
-  Sparkles
+  Sparkles,
+  BarChart2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -34,11 +35,12 @@ import {
   PieChart,
   Pie
 } from 'recharts';
-import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, isSameDay, startOfYear, endOfYear, isSameMonth, isSameYear } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, isSameDay, startOfYear, endOfYear, isSameMonth, isSameYear, isValid } from 'date-fns';
 import { DEPARTMENTS, DEFAULT_CATEGORIES, type Expense, type Department, type Category, type CashIn } from './types';
 import { ProcurementAdvancesPage } from './ProcurementAdvances';
 import { StaffLoanTrackerPage } from './StaffLoanTracker';
 import { CreditPurchaseTrackerPage } from './CreditPurchaseTracker';
+import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 
@@ -66,11 +68,73 @@ import {
   orderBy 
 } from 'firebase/firestore';
 
+// Brand Logo URL
+const logoUrl = new URL('../CDPathlogo.png', import.meta.url).href;
+
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function toSafeNumber(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function convertNumberToWords(amount: number): string {
+  const units = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const scales = ['', 'Thousand', 'Million', 'Billion'];
+
+  if (amount < 0) {
+    return `Minus ${convertNumberToWords(Math.abs(amount))}`;
+  }
+
+  if (amount < 20) {
+    return units[amount];
+  }
+
+  if (amount < 100) {
+    const remainder = amount % 10;
+    return remainder === 0 ? tens[Math.floor(amount / 10)] : `${tens[Math.floor(amount / 10)]} ${units[remainder]}`;
+  }
+
+  if (amount < 1000) {
+    const remainder = amount % 100;
+    return remainder === 0
+      ? `${units[Math.floor(amount / 100)]} Hundred`
+      : `${units[Math.floor(amount / 100)]} Hundred ${convertNumberToWords(remainder)}`;
+  }
+
+  for (let i = 1; i < scales.length; i += 1) {
+    const unit = 1000 ** i;
+    if (amount < unit * 1000) {
+      const major = Math.floor(amount / unit);
+      const remainder = amount % unit;
+      const majorWords = `${convertNumberToWords(major)} ${scales[i]}`;
+      return remainder === 0
+        ? majorWords
+        : `${majorWords} ${convertNumberToWords(remainder)}`;
+    }
+  }
+
+  return amount.toString();
+}
+
+function formatAmountInWords(amount: number): string {
+  const total = Math.round(amount * 100) / 100;
+  const taka = Math.floor(total);
+  const paise = Math.round((total - taka) * 100);
+
+  if (taka === 0 && paise === 0) {
+    return 'Zero Taka Only';
+  }
+
+  const takaWords = convertNumberToWords(taka);
+  const paiseWords = paise > 0 ? ` and ${convertNumberToWords(paise)} Paise` : '';
+
+  return `${takaWords} Taka${paiseWords} Only`;
+}
 
 export default function App() {
   return (
@@ -86,7 +150,7 @@ function PettyCashApp() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [cashIn, setCashIn] = useState<CashIn[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'daily' | 'entry' | 'add-cash' | 'history' | 'sheets' | 'settings' | 'procurement' | 'loans' | 'credits'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'daily' | 'entry' | 'add-cash' | 'history' | 'sheets' | 'settings' | 'procurement' | 'loans' | 'credits'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState<Department | 'All'>('All');
   const [historyFilter, setHistoryFilter] = useState<{
@@ -142,6 +206,36 @@ function PettyCashApp() {
         : 'All Time';
 
   const historyTotalAmount = filteredHistoryExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  const exportHistoryToExcel = () => {
+    const rows = filteredHistoryExpenses.map(expense => [
+      format(parseISO(expense.date), 'yyyy-MM-dd'),
+      expense.department,
+      expense.category,
+      expense.description.replace(/\n/g, ' ').trim(),
+      Number(expense.amount || 0).toFixed(2)
+    ]);
+
+    const totalRow = ['Total Expenses', '', '', '', Number(historyTotalAmount || 0).toFixed(2)];
+    const csvHeaders = ['Date', 'Department', 'Category', 'Description', 'Amount'];
+    const csvBody = [csvHeaders, ...rows, totalRow]
+      .map(row => row.map(value => {
+        const stringValue = String(value ?? '');
+        const escaped = stringValue.replace(/"/g, '""');
+        return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+      }).join(','))
+      .join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvBody], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `transaction-history-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const historyDepartmentTotals = DEPARTMENTS.map(dept => ({
     department: dept,
@@ -200,15 +294,25 @@ function PettyCashApp() {
 
     const qCashIn = query(collection(db, 'cashIn'), orderBy('createdAt', 'desc'));
     const unsubCashIn = onSnapshot(qCashIn, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CashIn));
+      const data = snapshot.docs.map(doc => {
+        const rawData = doc.data() as Partial<CashIn> & { amount?: unknown };
+        return {
+          id: doc.id,
+          ...rawData,
+          amount: toSafeNumber(rawData.amount)
+        } as CashIn;
+      });
       setCashIn(data);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'cashIn'));
 
     const qCategories = query(collection(db, 'categories'), orderBy('createdAt', 'asc'));
     const unsubCategories = onSnapshot(qCategories, (snapshot) => {
-      const data = snapshot.docs.map(doc => (doc.data().name as string));
-      if (data.length > 0) {
-        setCategories(data);
+      const data = snapshot.docs
+        .map(doc => doc.data().name as string)
+        .filter(Boolean);
+      const uniqueCategories = Array.from(new Set(data));
+      if (uniqueCategories.length > 0) {
+        setCategories(uniqueCategories);
       } else {
         setCategories(DEFAULT_CATEGORIES);
       }
@@ -340,10 +444,28 @@ function PettyCashApp() {
   const deleteExpense = async (id: string) => {
     if (!user) return;
     if (confirm('Are you sure you want to delete this entry?')) {
+      setIsSyncing(true);
+      try {
+        const response = await fetch(`/api/expenses/${id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setExpenses(prev => prev.filter(e => String(e.id) !== String(id)));
+          await fetchExpenses();
+        } else {
+          setExpenses(prev => prev.filter(e => String(e.id) !== String(id)));
+        }
+      } catch (error) {
+        console.error('Error deleting expense from local API:', error);
+        setExpenses(prev => prev.filter(e => String(e.id) !== String(id)));
+      }
+
       try {
         await deleteDoc(doc(db, 'expenses', id));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `expenses/${id}`);
+      } catch (fsError) {
+        // Silently ignore if doc doesn't exist in Firestore or offline
+      } finally {
+        setIsSyncing(false);
       }
     }
   };
@@ -410,7 +532,7 @@ function PettyCashApp() {
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-4">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <img src="https://www.cdpathhospital.com/assets/logo.png" alt="CD PATH & HOSPITAL logo" className="mx-auto h-16 mb-3" />
+            <img src={logoUrl} alt="CD PATH & HOSPITAL logo" className="mx-auto h-16 mb-3" />
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">CD PATH & HOSPITAL</h1>
             <p className="text-slate-500 mt-2">Petty Cash Management System</p>
           </div>
@@ -509,8 +631,8 @@ function PettyCashApp() {
   }
 
   // Calculations
-  const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalCashIn = cashIn.reduce((sum, c) => sum + c.amount, 0);
+  const totalSpent = expenses.reduce((sum, e) => sum + toSafeNumber(e.amount), 0);
+  const totalCashIn = cashIn.reduce((sum, c) => sum + toSafeNumber(c.amount), 0);
   const remainingCash = totalCashIn - totalSpent;
 
   const today = new Date();
@@ -527,11 +649,20 @@ function PettyCashApp() {
     value: expenses.filter(e => e.category === cat).reduce((sum, e) => sum + e.amount, 0)
   })).filter(c => c.value != null && c.value > 0);
 
-  const categoryData = groupSmallCategories(categoryDataRaw, 7);
+  const categoryData = groupSmallCategories(categoryDataRaw, 5, 0.05);
 
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  const departmentColors = ['#0f766e', '#14b8a6', '#2dd4bf', '#a7f3d0', '#e2e8f0'];
+  const categoryColors = ['#00a86b', '#64748b', '#4f46e5', '#8b9b84', '#f59e0b', '#cbd5e1'];
 
-  function groupSmallCategories(data: Array<{ name: string; value: number }>, maxItems: number) {
+  function formatCompactCurrency(value: number) {
+    if (value >= 10000000) return `৳${(value / 10000000).toFixed(1)}Cr`;
+    if (value >= 1000000) return `৳${(value / 1000000).toFixed(1)}M`;
+    if (value >= 100000) return `৳${(value / 100000).toFixed(1)}L`;
+    if (value >= 1000) return `৳${(value / 1000).toFixed(1)}K`;
+    return `৳${value.toLocaleString()}`;
+  }
+
+  function groupSmallCategories(data: Array<{ name: string; value: number }>, maxItems: number, minPercent: number) {
     const filtered = data
       .filter(item => item.value != null && item.value !== 0)
       .sort((a, b) => b.value - a.value);
@@ -540,11 +671,17 @@ function PettyCashApp() {
       return filtered;
     }
 
-    const topItems = filtered.slice(0, maxItems - 1);
-    const otherItems = filtered.slice(maxItems - 1);
+    const total = filtered.reduce((sum, item) => sum + item.value, 0);
+    const topItems = filtered.filter(item => (item.value / Math.max(total, 1)) >= minPercent);
+    const otherItems = filtered.filter(item => (item.value / Math.max(total, 1)) < minPercent);
+    const limitedTopItems = topItems.slice(0, maxItems - 1);
     const otherValue = otherItems.reduce((sum, item) => sum + item.value, 0);
 
-    return [...topItems, { name: 'Other', value: otherValue }];
+    if (otherValue <= 0) {
+      return limitedTopItems;
+    }
+
+    return [...limitedTopItems, { name: 'Others', value: otherValue }];
   }
 
   return (
@@ -553,7 +690,7 @@ function PettyCashApp() {
       <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 z-50 hidden md:flex flex-col">
         <div className="p-6 border-bottom border-slate-100">
           <div className="flex items-center gap-3 mb-1">
-            <img src="https://www.cdpathhospital.com/assets/logo.png" alt="CD PATH & HOSPITAL logo" className="w-8 h-8 rounded-lg object-cover" />
+            <img src={logoUrl} alt="CD PATH & HOSPITAL logo" className="w-8 h-8 rounded-lg object-cover" />
             <h1 className="font-bold text-lg tracking-tight">CD PATH & HOSPITAL</h1>
           </div>
           <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Petty Cash System</p>
@@ -565,6 +702,12 @@ function PettyCashApp() {
             label="Dashboard" 
             active={activeTab === 'dashboard'} 
             onClick={() => setActiveTab('dashboard')} 
+          />
+          <NavItem 
+            icon={<BarChart2 size={20} />} 
+            label="Analytics & Reports" 
+            active={activeTab === 'analytics'} 
+            onClick={() => setActiveTab('analytics')} 
           />
           <NavItem 
             icon={<TrendingUp size={20} />} 
@@ -652,6 +795,7 @@ function PettyCashApp() {
           <div>
             <h2 className="text-2xl font-bold text-slate-900">
               {activeTab === 'dashboard' && 'Financial Overview'}
+              {activeTab === 'analytics' && 'Analytics & Intelligence Reports'}
               {activeTab === 'daily' && 'Daily Petty Cash Dashboard'}
               {activeTab === 'entry' && 'Record Expense'}
               {activeTab === 'add-cash' && 'Add Petty Cash'}
@@ -708,24 +852,40 @@ function PettyCashApp() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    Spending by Department
-                  </h3>
-                  <div className="h-[300px] w-full">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] transition-all h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400 font-semibold">Focus</p>
+                      <h3 className="font-semibold text-slate-800">Spending by Department</h3>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-h-[300px] w-full">
                     {deptData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={deptData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
-                          <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
-                          <Tooltip 
-                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                        <BarChart data={deptData} barCategoryGap="24%">
+                          <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
+                          <XAxis
+                            dataKey="name"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Inter, ui-sans-serif, system-ui' }}
                           />
-                          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Inter, ui-sans-serif, system-ui' }}
+                            tickFormatter={(value: number) => formatCompactCurrency(value)}
+                            width={56}
+                          />
+                          <Tooltip
+                            cursor={{ fill: 'rgba(0, 168, 107, 0.05)' }}
+                            formatter={(value: number) => [`৳${Number(value).toLocaleString()}`, 'Amount']}
+                            contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px rgba(15, 23, 42, 0.08)', fontFamily: 'Inter, ui-sans-serif, system-ui' }}
+                          />
+                          <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={32} maxBarSize={36} barPercentage={0.6}>
                             {deptData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              <Cell key={`dept-cell-${index}`} fill={departmentColors[index % departmentColors.length]} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -736,39 +896,54 @@ function PettyCashApp() {
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-slate-800 mb-6">Category Breakdown</h3>
-                  <div className="h-[300px] w-full flex items-center justify-center">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] transition-all h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400 font-semibold">Breakdown</p>
+                      <h3 className="font-semibold text-slate-800">Category Breakdown</h3>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-h-[300px] w-full">
                     {categoryData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={categoryData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                          >
-                            {categoryData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
+                      <div className="flex items-center justify-center gap-4 h-full w-full">
+                        <div className="flex-1 max-w-[260px] h-[260px]">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                            <PieChart>
+                              <Pie
+                                data={categoryData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={70}
+                                outerRadius={110}
+                                paddingAngle={2}
+                                strokeWidth={3}
+                                stroke="#ffffff"
+                                dataKey="value"
+                              >
+                                {categoryData.map((entry, index) => (
+                                  <Cell key={`category-cell-${index}`} fill={categoryColors[index % categoryColors.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value) => value !== undefined ? [`৳${Number(value).toLocaleString()}`, 'Amount'] : ['N/A', 'Amount']}
+                                contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px rgba(15, 23, 42, 0.08)', fontFamily: 'Inter, ui-sans-serif, system-ui' }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="w-[170px] flex-shrink-0 flex flex-col justify-center gap-2.5 pr-1">
+                          {categoryData.map((cat, i) => (
+                            <div key={`category-${i}`} className="flex items-center gap-2 text-[11px] text-slate-600">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: categoryColors[i % categoryColors.length] }} />
+                              <span className="truncate flex-1">{cat.name}</span>
+                              <span className="font-semibold text-slate-700">{Math.round((cat.value / Math.max(categoryData.reduce((sum, item) => sum + item.value, 0), 1)) * 100)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ) : (
                       <EmptyState message="No data to display yet." />
                     )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    {categoryData.map((cat, i) => (
-                      <div key={`category-${i}`} className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        <span className="text-[10px] text-slate-500 truncate">{cat.name}</span>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -917,13 +1092,22 @@ function PettyCashApp() {
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
-                <button 
-                  onClick={() => setShowHistoryPrintPreview(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-all print:hidden"
-                >
-                  <Printer size={18} />
-                  Print Preview
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={exportHistoryToExcel}
+                    className="flex items-center gap-2 border border-emerald-600/20 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 rounded-lg hover:bg-emerald-100 transition-all print:hidden"
+                  >
+                    <Download size={18} />
+                    Export to Excel
+                  </button>
+                  <button 
+                    onClick={() => setShowHistoryPrintPreview(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-all print:hidden"
+                  >
+                    <Printer size={18} />
+                    Print Preview
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1090,9 +1274,9 @@ function PettyCashApp() {
           )}
 
           {showHistoryPrintPreview && (
-            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/70 p-4 print:hidden print-modal">
-              <div className="w-full max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl print:rounded-none print:border-0 print:shadow-none print:p-0 print:w-screen">
-                <div className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 p-5 md:flex-row md:items-center md:justify-between print-modal-header print:hidden">
+            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/70 p-2 print-modal print:static print:inset-auto print:overflow-visible print:bg-transparent print:p-0">
+              <div className="w-full max-w-6xl max-h-[90vh] overflow-hidden overflow-y-auto print-preview-scroller rounded-[2rem] border border-slate-200 bg-white shadow-2xl print:rounded-none print:border-0 print:shadow-none print:p-0 print:w-screen print:max-w-[5.5in] print:mx-auto">
+                <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between print-modal-header print:hidden">
                   <div>
                     <p className="text-xs uppercase tracking-widest text-slate-500">Print Preview</p>
                     <h3 className="text-xl font-bold text-slate-900">Transaction History Report</h3>
@@ -1114,31 +1298,77 @@ function PettyCashApp() {
                     </button>
                   </div>
                 </div>
-                <div className="space-y-6 p-6 print:p-0 print:m-0">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3 text-sm text-slate-700 print:gap-2">
-                    <div className="rounded-2xl border border-slate-200 p-4 print:border print:border-slate-400 print:p-3 print:bg-slate-100">
+                <div className="space-y-4 p-4 print:p-0 print:m-0">
+                  <div className="print:block hidden">
+                    <div className="print-cover-sheet">
+                      <div className="print-cover-header">
+                        <div className="print-cover-brand">
+                          <img src={logoUrl} alt="CD PATH & HOSPITAL logo" className="h-10 w-10 object-contain" />
+                          <div>
+                            <p className="print-cover-company">CD Path & Hospital (Pvt.) Ltd.</p>
+                            <p className="print-cover-system">PETTY CASH SYSTEM</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="print-cover-details">
+                        <div>
+                          <p className="print-cover-label">Date</p>
+                          <p className="print-cover-value">{historyPeriodLabel}</p>
+                        </div>
+                        <div>
+                          <p className="print-cover-label">Department</p>
+                          <p className="print-cover-value">{filterDept === 'All' ? 'A/C All Departments' : `A/C ${filterDept}`}</p>
+                        </div>
+                        <div>
+                          <p className="print-cover-label">Total Expense TK</p>
+                          <p className="print-cover-value">৳{historyTotalAmount.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="print-cover-label">Amount in Words</p>
+                          <p className="print-cover-value lowercase">{formatAmountInWords(historyTotalAmount)}</p>
+                        </div>
+                      </div>
+                      <div className="print-cover-signatures">
+                        <div className="print-signature-block">
+                          <div className="print-signature-line"></div>
+                          <p>Prepared By</p>
+                        </div>
+                        <div className="print-signature-block">
+                          <div className="print-signature-line"></div>
+                          <p>Verified By</p>
+                        </div>
+                        <div className="print-signature-block">
+                          <div className="print-signature-line"></div>
+                          <p>Approved By</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="page-break-after"></div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3 text-sm text-slate-700 print:gap-2">
+                    <div className="rounded-2xl border border-slate-200 p-3 print:border print:border-slate-400 print:p-2 print:bg-slate-100">
                       <p className="font-semibold text-slate-900">Filtered Records</p>
                       <p className="mt-2 text-2xl font-bold text-slate-900">{filteredHistoryExpenses.length}</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 p-4 print:border print:border-slate-400 print:p-3 print:bg-slate-100">
+                    <div className="rounded-2xl border border-slate-200 p-3 print:border print:border-slate-400 print:p-2 print:bg-slate-100">
                       <p className="font-semibold text-slate-900">Total Amount</p>
                       <p className="mt-2 text-2xl font-bold text-slate-900">৳{historyTotalAmount.toLocaleString()}</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 p-4 print:border print:border-slate-400 print:p-3">
+                    <div className="rounded-2xl border border-slate-200 p-3 print:border print:border-slate-400 print:p-2">
                       <p className="font-semibold text-slate-900">Preview Date</p>
                       <p className="mt-2 text-base text-slate-600">{format(new Date(), 'MMMM dd, yyyy')}</p>
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 mb-6 text-sm text-slate-700 print:rounded-none print:border-0 print:bg-white print:p-0 print:mb-4">
-                    <h4 className="mb-3 text-sm font-semibold text-slate-900">Department-wise Summary</h4>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 mb-4 text-sm text-slate-700 print:rounded-none print:border-0 print:bg-white print:p-0 print:mb-4">
+                    <h4 className="mb-2 text-sm font-semibold text-slate-900">Department-wise Summary</h4>
                     {filterDept === 'All' ? (
-                      <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white">
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                         <table className="w-full border-collapse text-sm">
                           <thead>
                             <tr className="bg-slate-100 text-left text-xs uppercase tracking-widest text-slate-500">
-                              <th className="border-b border-slate-200 px-4 py-3">Department</th>
-                              <th className="border-b border-slate-200 px-4 py-3 text-right">Amount</th>
+                              <th className="border-b border-slate-200 px-3 py-2">Department</th>
+                              <th className="border-b border-slate-200 px-3 py-2 text-right">Amount</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1159,48 +1389,52 @@ function PettyCashApp() {
                     )}
                   </div>
 
-                  <div className="overflow-x-auto rounded-3xl border border-slate-200 print:rounded-none print:border-0">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 print:rounded-none print:border-0">
                     <table className="w-full border-collapse text-sm print:w-full">
                       <thead>
                         <tr className="bg-slate-100 text-left text-xs uppercase tracking-widest text-slate-500 print:bg-slate-200">
-                          <th className="border-b border-slate-200 px-4 py-3 print:border print:border-slate-400">Date</th>
-                          <th className="border-b border-slate-200 px-4 py-3 print:border print:border-slate-400">Department</th>
-                          <th className="border-b border-slate-200 px-4 py-3 print:border print:border-slate-400">Category</th>
-                          <th className="border-b border-slate-200 px-4 py-3 print:border print:border-slate-400">Description</th>
-                          <th className="border-b border-slate-200 px-4 py-3 text-right print:border print:border-slate-400">Amount</th>
+                          <th className="border-b border-slate-200 px-3 py-2 print:border print:border-slate-400">Date</th>
+                          <th className="border-b border-slate-200 px-3 py-2 print:border print:border-slate-400">Department</th>
+                          <th className="border-b border-slate-200 px-3 py-2 print:border print:border-slate-400">Category</th>
+                          <th className="border-b border-slate-200 px-3 py-2 print:border print:border-slate-400">Description</th>
+                          <th className="border-b border-slate-200 px-3 py-2 text-right print:border print:border-slate-400">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredHistoryExpenses.map(expense => (
                           <tr key={expense.id} className="border-b border-slate-200 last:border-0 bg-white hover:bg-slate-50 print:border print:border-slate-400">
-                            <td className="px-4 py-3 text-slate-800 print:border print:border-slate-400">{format(parseISO(expense.date), 'MMM dd, yyyy')}</td>
-                            <td className="px-4 py-3 text-slate-800 print:border print:border-slate-400">{expense.department}</td>
-                            <td className="px-4 py-3 text-slate-800 print:border print:border-slate-400">{expense.category}</td>
-                            <td className="px-4 py-3 text-slate-800 print:border print:border-slate-400">{expense.description}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-slate-900 print:border print:border-slate-400">৳{expense.amount.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-slate-800 print:border print:border-slate-400">{format(parseISO(expense.date), 'MMM dd, yyyy')}</td>
+                            <td className="px-3 py-2 text-slate-800 print:border print:border-slate-400">{expense.department}</td>
+                            <td className="px-3 py-2 text-slate-800 print:border print:border-slate-400">{expense.category}</td>
+                            <td className="px-3 py-2 text-slate-800 print:border print:border-slate-400">{expense.description}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-900 print:border print:border-slate-400">৳{expense.amount.toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-3 print:gap-3 print:mt-6">
-                    <div className="rounded-2xl border border-slate-200 p-4 text-center print:border print:border-slate-400 print:rounded-none">
+                  <div className="grid gap-2 md:grid-cols-3 print:gap-3 print:mt-4">
+                    <div className="rounded-2xl border border-slate-200 p-3 text-center print:border print:border-slate-400 print:rounded-none">
                       <div className="h-12 border-b border-slate-200 print:border-slate-400"></div>
-                      <p className="mt-3 text-[10px] uppercase tracking-widest text-slate-500">Prepared By</p>
+                      <p className="mt-2 text-[10px] uppercase tracking-widest text-slate-500">Prepared By</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 p-4 text-center print:border print:border-slate-400 print:rounded-none">
+                    <div className="rounded-2xl border border-slate-200 p-3 text-center print:border print:border-slate-400 print:rounded-none">
                       <div className="h-12 border-b border-slate-200 print:border-slate-400"></div>
-                      <p className="mt-3 text-[10px] uppercase tracking-widest text-slate-500">Verified By</p>
+                      <p className="mt-2 text-[10px] uppercase tracking-widest text-slate-500">Verified By</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 p-4 text-center print:border print:border-slate-400 print:rounded-none">
+                    <div className="rounded-2xl border border-slate-200 p-3 text-center print:border print:border-slate-400 print:rounded-none">
                       <div className="h-12 border-b border-slate-200 print:border-slate-400"></div>
-                      <p className="mt-3 text-[10px] uppercase tracking-widest text-slate-500">Approved By</p>
+                      <p className="mt-2 text-[10px] uppercase tracking-widest text-slate-500">Approved By</p>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <AnalyticsDashboard expenses={expenses} cashIn={cashIn} categories={categories} />
           )}
 
           {activeTab === 'sheets' && <SheetsGuide />}
@@ -1408,7 +1642,7 @@ function ExpenseForm({ onSubmit, categories, onAddCategory, isSyncing }: {
               onChange={e => setFormData({...formData, category: e.target.value})}
             >
               <option value="" disabled>Select Category</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              {categories.map((c, idx) => <option key={`${c}-${idx}`} value={c}>{c}</option>)}
             </select>
           )}
         </div>
@@ -1550,9 +1784,18 @@ function DailyDashboard({ expenses, cashIn, reportFilter, setReportFilter }: {
 }) {
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
 
+  const safeParse = (s: string) => {
+    try {
+      const d = parseISO(s);
+      return isValid(d) ? d : new Date();
+    } catch {
+      return new Date();
+    }
+  };
+
   const filteredExpenses = expenses.filter(e => {
     const eDate = parseISO(e.date);
-    const filterDate = parseISO(reportFilter.date);
+    const filterDate = safeParse(reportFilter.date);
     if (reportFilter.type === 'daily') return isSameDay(eDate, filterDate);
     if (reportFilter.type === 'monthly') return format(eDate, 'yyyy-MM') === format(filterDate, 'yyyy-MM');
     if (reportFilter.type === 'yearly') return format(eDate, 'yyyy') === format(filterDate, 'yyyy');
@@ -1561,24 +1804,24 @@ function DailyDashboard({ expenses, cashIn, reportFilter, setReportFilter }: {
 
   const filteredCashIn = cashIn.filter(c => {
     const cDate = parseISO(c.date);
-    const filterDate = parseISO(reportFilter.date);
+    const filterDate = safeParse(reportFilter.date);
     if (reportFilter.type === 'daily') return isSameDay(cDate, filterDate);
     if (reportFilter.type === 'monthly') return format(cDate, 'yyyy-MM') === format(filterDate, 'yyyy-MM');
     if (reportFilter.type === 'yearly') return format(cDate, 'yyyy') === format(filterDate, 'yyyy');
     return false;
   });
 
-  const totalFund = cashIn.reduce((sum, c) => sum + c.amount, 0);
-  const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalFund = cashIn.reduce((sum, c) => sum + toSafeNumber(c.amount), 0);
+  const totalExpense = expenses.reduce((sum, e) => sum + toSafeNumber(e.amount), 0);
   const remainingBalance = totalFund - totalExpense;
   const periodExpense = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   const cashInBeforeDate = cashIn
-    .filter(c => parseISO(c.date) < parseISO(reportFilter.date))
+    .filter(c => parseISO(c.date) < safeParse(reportFilter.date))
     .reduce((sum, c) => sum + c.amount, 0);
 
   const expensesBeforeDate = expenses
-    .filter(e => parseISO(e.date) < parseISO(reportFilter.date))
+    .filter(e => parseISO(e.date) < safeParse(reportFilter.date))
     .reduce((sum, e) => sum + e.amount, 0);
 
   const cashInToday = filteredCashIn.reduce((sum, c) => sum + c.amount, 0);
@@ -1721,79 +1964,73 @@ function DailyDashboard({ expenses, cashIn, reportFilter, setReportFilter }: {
       {/* Print Only Section - Daily Report Format */}
       {reportFilter.type === 'daily' && (
         <div className="block print:block mt-8 daily-report-print">
-          {/* Company Header */}
-          <div className="flex flex-col items-center mb-5">
-            <div className="flex items-center justify-center gap-4">
-              <img src="https://www.cdpathhospital.com/assets/logo.png" alt="CD Path Hospital logo" className="h-16 w-16 object-contain" />
-              <div className="text-left">
-                <h1 className="text-2xl font-bold text-slate-900 leading-tight">CD Path & Hospital (Pvt.) Ltd.</h1>
-                <p className="text-sm uppercase tracking-widest text-slate-500 font-semibold">Petty Cash System</p>
+          <div className="mb-8 pb-6 border-b border-slate-300">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="flex items-center gap-4">
+                <img src={logoUrl} alt="CD Path Hospital logo" className="h-16 w-16 object-contain print-logo" />
+                <div>
+                  <p className="text-[16px] font-bold text-slate-900 leading-tight">CD Path & Hospital (Pvt.) Ltd.</p>
+                  <p className="text-sm uppercase tracking-[0.18em] text-slate-700 font-semibold">Petty Cash System</p>
+                </div>
               </div>
-            </div>
-            <h2 className="text-xl font-bold text-slate-800 mt-4">Daily Petty Cash Report</h2>
-            <p className="text-lg text-slate-600 mt-1">
-              Date: {format(parseISO(reportFilter.date), 'MMMM dd, yyyy')}
-            </p>
-          </div>
-
-          {/* Department-wise Expense Summary */}
-          <div className="mb-8">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 border-b-2 border-slate-300 pb-2">Department-wise Expense Summary</h3>
-            <table className="w-full border-collapse border border-slate-400">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="border border-slate-400 px-4 py-3 text-left font-bold text-slate-800">Department</th>
-                  <th className="border border-slate-400 px-4 py-3 text-right font-bold text-slate-800">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DEPARTMENTS.map(dept => {
-                  const amount = filteredExpenses.filter(e => e.department === dept).reduce((sum, e) => sum + e.amount, 0);
-                  return (
-                    <tr key={dept} className="hover:bg-slate-50">
-                      <td className="border border-slate-400 px-4 py-3 text-slate-700">{dept}</td>
-                      <td className="border border-slate-400 px-4 py-3 text-right font-semibold text-slate-900">৳{amount.toLocaleString()}</td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-slate-200 font-bold">
-                  <td className="border border-slate-400 px-4 py-3 text-slate-900">TOTAL</td>
-                  <td className="border border-slate-400 px-4 py-3 text-right text-slate-900">৳{periodExpense.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Cash Summary */}
-          <div className="mb-12">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 border-b-2 border-slate-300 pb-2">Cash Summary</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-red-50 border border-red-300 p-6 rounded-lg text-center">
-                <p className="text-sm font-semibold text-red-600 mb-2">Total Expense</p>
-                <p className="text-2xl font-bold text-red-600">৳{periodExpense.toLocaleString()}</p>
-              </div>
-              <div className="bg-emerald-50 border border-emerald-300 p-6 rounded-lg text-center">
-                <p className="text-sm font-semibold text-emerald-600 mb-2">Remaining Petty Cash Balance</p>
-                <p className="text-2xl font-bold text-emerald-600">৳{closingBalance.toLocaleString()}</p>
+              <div className="text-left md:text-right">
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-slate-900">Daily Petty Cash Report</p>
+                <p className="text-sm text-slate-700 mt-1">Date: {format(safeParse(reportFilter.date), 'MMMM dd, yyyy')}</p>
               </div>
             </div>
           </div>
 
-          {/* Signature Section */}
-          <div className="mt-20 pt-10 border-t-2 border-slate-400">
-            <div className="flex justify-between">
-              <div className="text-center flex-1">
-                <div className="w-full border-b border-slate-900 mb-2"></div>
-                <p className="text-sm font-bold uppercase text-slate-700">Prepared By</p>
+          <div className="mb-10">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-[0.18em] mb-4">Department-wise Expense Summary</h3>
+            <div className="overflow-hidden border border-slate-300">
+              <table className="w-full min-w-full border-collapse">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="border border-slate-300 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-800">Department</th>
+                    <th className="border border-slate-300 px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.14em] text-slate-800">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {DEPARTMENTS.map(dept => {
+                    const amount = filteredExpenses.filter(e => e.department === dept).reduce((sum, e) => sum + e.amount, 0);
+                    return (
+                      <tr key={dept} className="bg-white">
+                        <td className="border border-slate-300 px-4 py-3 text-sm text-slate-700">{dept}</td>
+                        <td className="border border-slate-300 px-4 py-3 text-right text-sm font-semibold text-slate-900">৳{amount.toLocaleString()}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-slate-200 font-bold">
+                    <td className="border border-slate-300 px-4 py-3 text-sm text-slate-900">TOTAL</td>
+                    <td className="border border-slate-300 px-4 py-3 text-right text-sm text-slate-900">৳{periodExpense.toLocaleString()}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mb-10">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-[0.18em] mb-4">Cash Summary</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="border border-slate-300 bg-white p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">Total Expense</p>
+                <p className="mt-3 text-2xl font-bold text-slate-900">৳{periodExpense.toLocaleString()}</p>
               </div>
-              <div className="text-center flex-1 mx-8">
-                <div className="w-full border-b border-slate-900 mb-2"></div>
-                <p className="text-sm font-bold uppercase text-slate-700">Verified By</p>
+              <div className="border border-slate-300 bg-white p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">Remaining Petty Cash Balance</p>
+                <p className="mt-3 text-2xl font-bold text-slate-900">৳{closingBalance.toLocaleString()}</p>
               </div>
-              <div className="text-center flex-1">
-                <div className="w-full border-b border-slate-900 mb-2"></div>
-                <p className="text-sm font-bold uppercase text-slate-700">Approved By</p>
-              </div>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-slate-300">
+            <div className="grid gap-6 md:grid-cols-3">
+              {['Prepared By', 'Verified By', 'Approved By'].map((label) => (
+                <div key={label} className="text-center">
+                  <div className="mx-auto mb-3 h-px w-32 bg-slate-900"></div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">{label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1918,8 +2155,8 @@ function CategorySettings({ categories, onAdd, onDelete }: {
       <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
         <h3 className="font-bold text-slate-800 mb-6">Existing Categories</h3>
         <div className="space-y-2">
-          {categories.map(cat => (
-            <div key={cat} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100 group">
+          {categories.map((cat, idx) => (
+            <div key={`${cat}-${idx}`} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100 group">
               <span className="text-sm text-slate-700">{cat}</span>
               <button 
                 onClick={() => onDelete(cat)}

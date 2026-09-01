@@ -137,10 +137,68 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+export function formatBDT(amount: number): string {
+  const safe = Number(amount) || 0;
+  return `৳${safe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
+}
+
+export function numberToWords(num: number): string {
+  const safeNum = Number(num);
+  if (!Number.isFinite(safeNum) || safeNum === 0) return "Zero Taka Only";
+  
+  const units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", 
+                 "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  function convertChunk(n: number): string {
+    let str = "";
+    if (n >= 100) {
+      str += units[Math.floor(n / 100)] + " Hundred ";
+      n %= 100;
+    }
+    if (n >= 20) {
+      str += tens[Math.floor(n / 10)] + " ";
+      n %= 10;
+    }
+    if (n > 0) {
+      str += units[n] + " ";
+    }
+    return str.trim();
+  }
+
+  let taka = Math.floor(Math.abs(safeNum));
+  let poisha = Math.round((Math.abs(safeNum) - taka) * 100);
+  let words = "";
+
+  if (taka >= 10000000) {
+    words += convertChunk(Math.floor(taka / 10000000)) + " Crore ";
+    taka %= 10000000;
+  }
+  if (taka >= 100000) {
+    words += convertChunk(Math.floor(taka / 100000)) + " Lakh ";
+    taka %= 100000;
+  }
+  if (taka >= 1000) {
+    words += convertChunk(Math.floor(taka / 1000)) + " Thousand ";
+    taka %= 1000;
+  }
+  if (taka > 0) {
+    words += convertChunk(taka) + " ";
+  }
+
+  words = words.trim() + " Taka";
+
+  if (poisha > 0) {
+    words += " and " + convertChunk(poisha) + " Poisha";
+  }
+
+  return words + " Only";
 }

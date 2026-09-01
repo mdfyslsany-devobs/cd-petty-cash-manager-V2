@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, AlertTriangle, Clock, Search } from 'lucide-react';
+import { Plus, AlertTriangle, Clock, Search, Printer } from 'lucide-react';
 import { StaffLoan, DEPARTMENTS } from './types';
-import { calculateLoanStats, formatCurrency, formatDate, getRemainingBalance, isOverdue } from './ModuleCalculations';
+import { calculateLoanStats, formatCurrency, formatBDT, formatDate, getRemainingBalance, isOverdue } from './ModuleCalculations';
 import { ConfirmDialog } from './ConfirmDialog';
+import { StaffLoanPrintModal } from './StaffLoanPrintModal';
 
 interface StaffLoanTrackerPageProps {
   onNavigate?: (tab: string) => void;
@@ -14,6 +15,7 @@ export function StaffLoanTrackerPage({ onNavigate }: StaffLoanTrackerPageProps) 
   const [showAddForm, setShowAddForm] = useState(false);
   const [showRepayForm, setShowRepayForm] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<StaffLoan | null>(null);
+  const [voucherLoan, setVoucherLoan] = useState<StaffLoan | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Unpaid' | 'Partially Paid' | 'Paid'>('All');
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: '' });
@@ -47,6 +49,7 @@ export function StaffLoanTrackerPage({ onNavigate }: StaffLoanTrackerPageProps) 
       if (response.ok) {
         setLoans([result.loan, ...loans]);
         setShowAddForm(false);
+        setVoucherLoan(result.loan);
       }
     } catch (error) {
       console.error('Failed to add loan:', error);
@@ -163,6 +166,7 @@ export function StaffLoanTrackerPage({ onNavigate }: StaffLoanTrackerPageProps) 
             <LoanCard
               key={loan.id}
               loan={loan}
+              onPrint={() => setVoucherLoan(loan)}
               onAddRepayment={() => {
                 setSelectedLoan(loan);
                 setShowRepayForm(true);
@@ -202,6 +206,14 @@ export function StaffLoanTrackerPage({ onNavigate }: StaffLoanTrackerPageProps) 
         onConfirm={() => handleDelete(confirmDialog.id)}
         onCancel={() => setConfirmDialog({ isOpen: false, id: '' })}
       />
+
+      {/* Printable Staff Loan Voucher Modal */}
+      {voucherLoan && (
+        <StaffLoanPrintModal
+          loan={voucherLoan}
+          onClose={() => setVoucherLoan(null)}
+        />
+      )}
     </div>
   );
 }
@@ -237,12 +249,13 @@ function StatCard({ label, value, color }: StatCardProps) {
 
 interface LoanCardProps {
   loan: StaffLoan;
+  onPrint: () => void;
   onAddRepayment: () => void;
   onDelete: () => void;
   key?: React.Key;
 }
 
-function LoanCard({ loan, onAddRepayment, onDelete }: LoanCardProps) {
+function LoanCard({ loan, onPrint, onAddRepayment, onDelete }: LoanCardProps) {
   const statusColors = {
     Unpaid: 'bg-red-100 text-red-800',
     'Partially Paid': 'bg-yellow-100 text-yellow-800',
@@ -262,7 +275,7 @@ function LoanCard({ loan, onAddRepayment, onDelete }: LoanCardProps) {
             <p className="text-sm text-gray-600">{loan.department}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isLoanOverdue && (
             <div className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
               <AlertTriangle className="w-4 h-4" />
@@ -313,7 +326,7 @@ function LoanCard({ loan, onAddRepayment, onDelete }: LoanCardProps) {
         <div className="mb-4 bg-gray-50 rounded p-3 text-sm">
           <p className="font-semibold text-gray-900 mb-2">Repayments ({loan.repayments.length})</p>
           <ul className="space-y-1">
-            {loan.repayments.map((r, i) => (
+            {loan.repayments.map((r) => (
               <li key={r.id} className="flex justify-between text-gray-700">
                 <span>{formatDate(r.paymentDate)}</span>
                 <span className="font-semibold">{formatCurrency(r.paidAmount)}</span>
@@ -323,18 +336,30 @@ function LoanCard({ loan, onAddRepayment, onDelete }: LoanCardProps) {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={onPrint}
+          className="px-3.5 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors border border-slate-200"
+          title="Print Staff Loan Agreement & Receipt"
+        >
+          <Printer className="w-4 h-4 text-emerald-600" />
+          <span>Print Agreement / Receipt</span>
+        </button>
+
         {loan.status !== 'Paid' && (
           <button
+            type="button"
             onClick={onAddRepayment}
-            className="flex-1 px-3 py-2 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm font-medium"
+            className="flex-1 min-w-[120px] px-3.5 py-2 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg text-sm font-medium transition-colors"
           >
             Add Repayment
           </button>
         )}
         <button
+          type="button"
           onClick={onDelete}
-          className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm font-medium"
+          className="px-3.5 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-sm font-medium transition-colors"
         >
           Delete
         </button>

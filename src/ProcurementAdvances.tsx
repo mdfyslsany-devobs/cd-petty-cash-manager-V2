@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Filter, Download, Printer, Search, MoreVertical } from 'lucide-react';
 import { ProcurementAdvance } from './types';
-import { calculateProcurementStats, formatCurrency, formatDate } from './ModuleCalculations';
+import { calculateProcurementStats, formatCurrency, formatDate, numberToWords } from './ModuleCalculations';
 import { ConfirmDialog } from './ConfirmDialog';
+
+// Brand Logo URL
+const logoUrl = new URL('../CDPathlogo.png', import.meta.url).href;
 
 interface ProcurementAdvancesPageProps {
   onNavigate?: (tab: string) => void;
@@ -14,6 +17,7 @@ export function ProcurementAdvancesPage({ onNavigate }: ProcurementAdvancesPageP
   const [showAddForm, setShowAddForm] = useState(false);
   const [showAdjustForm, setShowAdjustForm] = useState(false);
   const [selectedAdvance, setSelectedAdvance] = useState<ProcurementAdvance | null>(null);
+  const [voucherAdvance, setVoucherAdvance] = useState<ProcurementAdvance | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Adjusted' | 'Returned'>('All');
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: '' });
@@ -47,6 +51,7 @@ export function ProcurementAdvancesPage({ onNavigate }: ProcurementAdvancesPageP
       if (response.ok) {
         setAdvances([result.advance, ...advances]);
         setShowAddForm(false);
+        setVoucherAdvance(result.advance);
       }
     } catch (error) {
       console.error('Failed to add advance:', error);
@@ -157,6 +162,7 @@ export function ProcurementAdvancesPage({ onNavigate }: ProcurementAdvancesPageP
                 setSelectedAdvance(advance);
                 setShowAdjustForm(true);
               }}
+              onPrintVoucher={() => setVoucherAdvance(advance)}
               onDelete={() => setConfirmDialog({ isOpen: true, id: advance.id })}
             />
           ))
@@ -192,6 +198,14 @@ export function ProcurementAdvancesPage({ onNavigate }: ProcurementAdvancesPageP
         onConfirm={() => handleDelete(confirmDialog.id)}
         onCancel={() => setConfirmDialog({ isOpen: false, id: '' })}
       />
+
+      {/* Printable Voucher Modal */}
+      {voucherAdvance && (
+        <ProcurementVoucherModal
+          advance={voucherAdvance}
+          onClose={() => setVoucherAdvance(null)}
+        />
+      )}
     </div>
   );
 }
@@ -228,11 +242,12 @@ function StatCard({ label, value, color }: StatCardProps) {
 interface AdvanceCardProps {
   advance: ProcurementAdvance;
   onAdjust: () => void;
+  onPrintVoucher: () => void;
   onDelete: () => void;
   key?: React.Key;
 }
 
-function AdvanceCard({ advance, onAdjust, onDelete }: AdvanceCardProps) {
+function AdvanceCard({ advance, onAdjust, onPrintVoucher, onDelete }: AdvanceCardProps) {
   const statusColors = {
     Pending: 'bg-orange-100 text-orange-800',
     Adjusted: 'bg-green-100 text-green-800',
@@ -266,6 +281,13 @@ function AdvanceCard({ advance, onAdjust, onDelete }: AdvanceCardProps) {
           </div>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={onPrintVoucher}
+            className="px-3 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-sm font-medium flex items-center gap-1"
+          >
+            <Printer size={15} />
+            Print Voucher
+          </button>
           <button
             onClick={onAdjust}
             className="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium"
@@ -489,3 +511,164 @@ function AdjustAdvanceForm({ advance, onSubmit, onClose }: AdjustAdvanceFormProp
     </div>
   );
 }
+
+interface ProcurementVoucherModalProps {
+  advance: ProcurementAdvance;
+  onClose: () => void;
+}
+
+function ProcurementVoucherModal({ advance, onClose }: ProcurementVoucherModalProps) {
+  const handlePrint = () => {
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const voucherId = `PAV-${advance.id.slice(-6).toUpperCase()}`;
+
+  return (
+    <div className="voucher-print-root fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto print:p-0 print:static print:bg-transparent">
+      <div
+        id="printable-procurement-voucher"
+        className="voucher-print-sheet bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-8 border border-slate-200 printable-voucher relative print:shadow-none print:border-none print:w-full print:max-w-full"
+      >
+        {/* Control Header - Hidden during print */}
+        <div className="flex items-center justify-between border-b pb-4 mb-6 print:hidden">
+          <div className="flex items-center gap-2">
+            <Printer className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-bold text-gray-900">Procurement Advance Voucher</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm"
+            >
+              <Printer size={16} />
+              Print Voucher
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        {/* Printable Area */}
+        <div className="space-y-6 text-slate-900">
+          {/* Voucher Header */}
+          <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={logoUrl}
+                alt="CD PATH Logo"
+                className="h-14 w-14 object-contain"
+              />
+              <div>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight">CD PATH & HOSPITAL</h1>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Petty Cash & Accounts Department</p>
+                <p className="text-[11px] text-slate-400">CD Path Road, Hospital Square</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="inline-block bg-blue-100 text-blue-800 font-extrabold text-xs px-3 py-1 rounded-md border border-blue-200 mb-1">
+                PROCUREMENT ADVANCE VOUCHER
+              </span>
+              <p className="text-xs font-mono text-slate-600">Voucher No: <strong className="text-slate-900">{voucherId}</strong></p>
+              <p className="text-xs text-slate-500">Disbursed Date: {formatDate(advance.date)}</p>
+            </div>
+          </div>
+
+          {/* Details Grid */}
+          <div className="grid grid-cols-2 gap-4 border border-slate-300 rounded-xl p-4 bg-slate-50 text-sm">
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Recipient / Officer Name</p>
+              <p className="text-base font-bold text-slate-900">{advance.officerName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Status</p>
+              <p className="text-base font-bold text-blue-700">{advance.status}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Disbursed Date</p>
+              <p className="font-semibold text-slate-800">{formatDate(advance.date)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Expected Purchase Date</p>
+              <p className="font-semibold text-slate-800">{formatDate(advance.expectedPurchaseDate)}</p>
+            </div>
+          </div>
+
+          {/* Purpose */}
+          <div className="border border-slate-300 rounded-xl p-4 text-sm">
+            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Purpose / Reason of Advance</p>
+            <p className="font-medium text-slate-800 whitespace-pre-wrap">{advance.purpose}</p>
+          </div>
+
+          {/* Amount Box */}
+          <div className="bg-slate-900 text-white rounded-xl p-5 flex justify-between items-center gap-4">
+            <div>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Advance Amount (In Words)</p>
+              <p className="text-sm font-semibold text-emerald-400 mt-0.5 italic">{numberToWords(advance.advanceAmount)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Amount</p>
+              <p className="text-2xl font-black text-white">{formatCurrency(advance.advanceAmount)}</p>
+            </div>
+          </div>
+
+          {/* Adjustments Section */}
+          {advance.adjustments && advance.adjustments.length > 0 && (
+            <div className="border border-slate-300 rounded-xl p-4 text-sm space-y-2">
+              <h4 className="font-bold text-slate-900 border-b pb-2 text-xs uppercase tracking-wider">Adjustment & Settlement Log</h4>
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b text-slate-500">
+                    <th className="py-1">Date</th>
+                    <th className="py-1 text-right">Purchase Amount</th>
+                    <th className="py-1 text-right">Returned Amount</th>
+                    <th className="py-1">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {advance.adjustments.map((adj) => (
+                    <tr key={adj.id} className="border-b last:border-0">
+                      <td className="py-1.5">{formatDate(new Date(adj.adjustedAt).toISOString())}</td>
+                      <td className="py-1.5 text-right font-medium">{adj.finalPurchaseAmount ? formatCurrency(adj.finalPurchaseAmount) : '-'}</td>
+                      <td className="py-1.5 text-right font-medium text-green-700">{adj.returnedAmount ? formatCurrency(adj.returnedAmount) : '-'}</td>
+                      <td className="py-1.5 text-slate-600">{adj.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Signature Block */}
+          <div className="pt-16 grid grid-cols-3 gap-8 text-center text-xs font-semibold text-slate-700">
+            <div>
+              <div className="border-t-2 border-slate-800 pt-2">
+                <p className="font-bold text-slate-900">Prepared By</p>
+                <p className="text-[10px] text-slate-500">Accounts / Staff</p>
+              </div>
+            </div>
+            <div>
+              <div className="border-t-2 border-slate-800 pt-2">
+                <p className="font-bold text-slate-900">Approved By</p>
+                <p className="text-[10px] text-slate-500">Authorized Authority</p>
+              </div>
+            </div>
+            <div>
+              <div className="border-t-2 border-slate-800 pt-2">
+                <p className="font-bold text-slate-900">Receiver's Signature</p>
+                <p className="text-[10px] text-slate-500">Mandatory Confirmation</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

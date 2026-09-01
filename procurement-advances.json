@@ -5,11 +5,21 @@
     "advanceAmount": 5400,
     "purpose": "ICU Doctor Snacks Bill Per Day 180x30 = 5400 (Advance Payment to ICU Cash Counter Order By Chief Accounts Officer)",
     "expectedPurchaseDate": "2026-07-01",
-    "status": "Pending",
+    "status": "Adjusted",
     "createdBy": "user",
     "id": "1780383325252",
     "createdAt": 1780383325252,
-    "adjustments": []
+    "adjustments": [
+      {
+        "id": "1782888628453",
+        "finalPurchaseAmount": 5400,
+        "returnedAmount": 5400,
+        "notes": "Month of June ",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782888628453
+      }
+    ],
+    "updatedAt": 1782888628453
   },
   {
     "date": "2026-06-13",
@@ -17,11 +27,21 @@
     "advanceAmount": 140,
     "purpose": "\n",
     "expectedPurchaseDate": "2026-06-13",
-    "status": "Pending",
+    "status": "Adjusted",
     "createdBy": "user",
     "id": "1781348421709",
     "createdAt": 1781348421709,
-    "adjustments": []
+    "adjustments": [
+      {
+        "id": "1782554499575",
+        "finalPurchaseAmount": 140,
+        "returnedAmount": 170,
+        "notes": "",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782554499575
+      }
+    ],
+    "updatedAt": 1782554499575
   },
   {
     "date": "2026-06-21",
@@ -117,11 +137,21 @@
     "advanceAmount": 3000,
     "purpose": "Dr. Abu Sayed Munshi Friday Lunch and Breakfast Item Purchase ",
     "expectedPurchaseDate": "2026-06-25",
-    "status": "Pending",
+    "status": "Adjusted",
     "createdBy": "user",
     "id": "1782311392277",
     "createdAt": 1782311392277,
-    "adjustments": []
+    "adjustments": [
+      {
+        "id": "1782478677158",
+        "finalPurchaseAmount": 3000,
+        "returnedAmount": 3000,
+        "notes": "",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782478677158
+      }
+    ],
+    "updatedAt": 1782478677158
   },
   {
     "date": "2026-06-25",
@@ -129,11 +159,21 @@
     "advanceAmount": 2000,
     "purpose": "pathology r apron, table mat",
     "expectedPurchaseDate": "2026-06-26",
-    "status": "Pending",
+    "status": "Returned",
     "createdBy": "user",
     "id": "1782368031814",
     "createdAt": 1782368031814,
-    "adjustments": []
+    "adjustments": [
+      {
+        "id": "1782478667614",
+        "finalPurchaseAmount": 2160,
+        "returnedAmount": -160,
+        "notes": "",
+        "finalStatus": "Returned",
+        "adjustedAt": 1782478667614
+      }
+    ],
+    "updatedAt": 1782478667614
   },
   {
     "date": "2026-06-25",
@@ -141,10 +181,328 @@
     "advanceAmount": 3000,
     "purpose": "for purchese ",
     "expectedPurchaseDate": "2026-06-26",
-    "status": "Pending",
+    "status": "Returned",
     "createdBy": "user",
     "id": "1782369001309",
     "createdAt": 1782369001309,
+    "adjustments": [
+      {
+        "id": "1782554332732",
+        "finalPurchaseAmount": 2860,
+        "returnedAmount": 140,
+        "notes": "Sticker ",
+        "finalStatus": "Returned",
+        "adjustedAt": 1782554332732
+      }
+    ],
+    "updatedAt": 1782554332732
+  },
+  {
+    "date": "2026-06-27",
+    "officerName": "Musfique Store",
+    "advanceAmount": 7000,
+    "purpose": "BP Machine ",
+    "expectedPurchaseDate": "2026-06-28",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1782554487898",
+    "createdAt": 1782554487898,
+    "adjustments": [
+      {
+        "id": "1782623848171",
+        "finalPurchaseAmount": 7000,
+        "returnedAmount": 0,
+        "notes": "3 BP Machine Purchases for Hospital and Dr. Helalur Rahman",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782623848172
+      }
+    ],
+    "updatedAt": 1782623848172
+  },
+  {
+    "date": "2026-06-29",
+    "officerName": "Musfique Store",
+    "advanceAmount": 8500,
+    "purpose": "For Monthly Meeting Dinner ",
+    "expectedPurchaseDate": "2026-06-29",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1782739147829",
+    "createdAt": 1782739147829,
+    "adjustments": [
+      {
+        "id": "1782809729510",
+        "finalPurchaseAmount": 13480,
+        "returnedAmount": -4980,
+        "notes": "",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782809729510
+      }
+    ],
+    "updatedAt": 1782809729510
+  },
+  {
+    "date": "2026-06-30",
+    "officerName": "Musfique Store ",
+    "advanceAmount": 10000,
+    "purpose": "Paint for Wall ",
+    "expectedPurchaseDate": "2026-06-30",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1782809779711",
+    "createdAt": 1782809779711,
+    "adjustments": [
+      {
+        "id": "1782826710720",
+        "finalPurchaseAmount": 7680,
+        "returnedAmount": 2420,
+        "notes": "White Color, Roller Foam, Poly and Transport cost",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782826710720
+      }
+    ],
+    "updatedAt": 1782826710720
+  },
+  {
+    "date": "2026-06-30",
+    "officerName": "Nazrul Store",
+    "advanceAmount": 7200,
+    "purpose": "For Purchase Important Product",
+    "expectedPurchaseDate": "2026-07-01",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1782826635083",
+    "createdAt": 1782826635083,
+    "adjustments": [
+      {
+        "id": "1782987327989",
+        "finalPurchaseAmount": 7200,
+        "returnedAmount": 0,
+        "notes": "Invoice return",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782987327989
+      }
+    ],
+    "updatedAt": 1782987327989
+  },
+  {
+    "date": "2026-07-01",
+    "officerName": "Nazrul Store",
+    "advanceAmount": 14660,
+    "purpose": "Windal+ 20 Box\nBodicod 15 Box",
+    "expectedPurchaseDate": "2026-07-01",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1782885539627",
+    "createdAt": 1782885539627,
+    "adjustments": [
+      {
+        "id": "1782987312450",
+        "finalPurchaseAmount": 14660,
+        "returnedAmount": 0,
+        "notes": "Voucher ",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1782987312450
+      }
+    ],
+    "updatedAt": 1782987312450
+  },
+  {
+    "date": "2026-07-01",
+    "officerName": "Saif ICU CCU Cash Counter",
+    "advanceAmount": 5580,
+    "purpose": "Medical Officer Daily Expense ",
+    "expectedPurchaseDate": "2026-07-31",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1782888662567",
+    "createdAt": 1782888662567,
+    "adjustments": [
+      {
+        "id": "1785740367773",
+        "finalPurchaseAmount": 5580,
+        "returnedAmount": 0,
+        "notes": "Month of July Done",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1785740367773
+      }
+    ],
+    "updatedAt": 1785740367773
+  },
+  {
+    "date": "2026-07-02",
+    "officerName": "Mr. Saiful, Electrician ",
+    "advanceAmount": 15000,
+    "purpose": "4th floor electrict stationary ",
+    "expectedPurchaseDate": "2026-07-04",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1782987280986",
+    "createdAt": 1782987280987,
+    "adjustments": [
+      {
+        "id": "1783262814774",
+        "finalPurchaseAmount": 13970,
+        "returnedAmount": 1030,
+        "notes": "for 4th floor doctor new chamber and 4th floor fan hok and ",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1783262814774
+      }
+    ],
+    "updatedAt": 1783262814774
+  },
+  {
+    "date": "2026-07-04",
+    "officerName": "Naime (Cleaning Supervisor)",
+    "advanceAmount": 19000,
+    "purpose": "Cleaning Item Purchase",
+    "expectedPurchaseDate": "2026-07-05",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1783166426375",
+    "createdAt": 1783166426375,
+    "adjustments": [
+      {
+        "id": "1783498785342",
+        "finalPurchaseAmount": 15920,
+        "returnedAmount": 0,
+        "notes": "",
+        "finalStatus": "Pending",
+        "adjustedAt": 1783498785342
+      },
+      {
+        "id": "1784181184469",
+        "finalPurchaseAmount": 15880,
+        "returnedAmount": 120,
+        "notes": "Purchases Done",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1784181184469
+      }
+    ],
+    "updatedAt": 1784181184469
+  },
+  {
+    "date": "2026-07-15",
+    "officerName": "Nazrul Store",
+    "advanceAmount": 2000,
+    "purpose": "For Phurchase ",
+    "expectedPurchaseDate": "2026-07-17",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1784094027391",
+    "createdAt": 1784094027391,
+    "adjustments": [
+      {
+        "id": "1784125334010",
+        "finalPurchaseAmount": 1800,
+        "returnedAmount": 200,
+        "notes": "NICU Spin Mob ",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1784125334010
+      }
+    ],
+    "updatedAt": 1784125334010
+  },
+  {
+    "date": "2026-07-30",
+    "officerName": "Nazrul Store",
+    "advanceAmount": 1000,
+    "purpose": "Battery For (OT) ",
+    "expectedPurchaseDate": "2026-07-30",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1785403929284",
+    "createdAt": 1785403929285,
+    "adjustments": [
+      {
+        "id": "1785563155447",
+        "finalPurchaseAmount": 560,
+        "returnedAmount": 440,
+        "notes": "Maxwell Battery 04x140",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1785563155447
+      }
+    ],
+    "updatedAt": 1785563155447
+  },
+  {
+    "date": "2026-08-03",
+    "officerName": "Saif ICU CCU",
+    "advanceAmount": 5580,
+    "purpose": "ICU Medical Officer Snacks Allowance",
+    "expectedPurchaseDate": "2026-09-03",
+    "status": "Pending",
+    "createdBy": "user",
+    "id": "1785740405497",
+    "createdAt": 1785740405497,
     "adjustments": []
+  },
+  {
+    "date": "2026-08-05",
+    "officerName": "Nazrul Store Officer",
+    "advanceAmount": 20000,
+    "purpose": "For Purchase office equipment",
+    "expectedPurchaseDate": "2026-09-05",
+    "status": "Pending",
+    "createdBy": "user",
+    "id": "1785938120527",
+    "createdAt": 1785938120527,
+    "adjustments": []
+  },
+  {
+    "date": "2026-08-09",
+    "officerName": "Shafique C/of Khokon Admin",
+    "advanceAmount": 3000,
+    "purpose": "for repair dr. zubayer chair",
+    "expectedPurchaseDate": "2026-08-10",
+    "status": "Pending",
+    "createdBy": "user",
+    "id": "1786257837640",
+    "createdAt": 1786257837640,
+    "adjustments": []
+  },
+  {
+    "date": "2026-08-27",
+    "officerName": "Morshed Supervisor",
+    "advanceAmount": 1600,
+    "purpose": "Hospital Staff Refresment Allowance ",
+    "expectedPurchaseDate": "2026-08-28",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1787847268420",
+    "createdAt": 1787847268420,
+    "adjustments": [
+      {
+        "id": "1787998604585",
+        "finalPurchaseAmount": 1560,
+        "returnedAmount": 40,
+        "notes": "Staff Snacks \n",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1787998604585
+      }
+    ],
+    "updatedAt": 1787998604585
+  },
+  {
+    "date": "2026-08-31",
+    "officerName": "Saiful Electric",
+    "advanceAmount": 12000,
+    "purpose": "Purchase Fan for Hospital ",
+    "expectedPurchaseDate": "2026-09-01",
+    "status": "Adjusted",
+    "createdBy": "user",
+    "id": "1788156612844",
+    "createdAt": 1788156612844,
+    "adjustments": [
+      {
+        "id": "1788164881859",
+        "finalPurchaseAmount": 11400,
+        "returnedAmount": 600,
+        "notes": "3 Selling Fan and 1 Extust fan for BMD Room 3rd Floor and 5th floor and nicu",
+        "finalStatus": "Adjusted",
+        "adjustedAt": 1788164881859
+      }
+    ],
+    "updatedAt": 1788164881859
   }
 ]
